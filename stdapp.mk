@@ -31,6 +31,10 @@
 # app. Note that the $(MAKE) call runs from the app subdirectory, so it's
 # best to use absolute paths based on TOP_DIR for the parameters.
 #
+# define STDAPP_NO_GIT_TAG if you never want to use git tags
+# define STDAPP_FORCE_GIT_TAG if you want to always use git tags
+# define STDAPP_NO_VSN_MK if you want to ignore any vsn.mk files
+#
 # Copyright (C) 2014 Klarna AB
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -99,7 +103,9 @@ ERL_TEST_SOURCES := $(wildcard $(TEST_DIR)/*.erl $(TEST_DIR)/*/*.erl)
 #   VSN=1.0
 #   $(APP_FILE): vsn.mk
 #
+ifndef STDAPP_NO_VSN_MK
 -include ./vsn.mk
+endif
 
 # read any application-specific definitions and rules
 -include ./app.mk
@@ -109,11 +115,19 @@ ERL_TEST_SOURCES := $(wildcard $(TEST_DIR)/*.erl $(TEST_DIR)/*/*.erl)
 export APPNAME
 -include apps/$(APPNAME).mk
 
+ifdef STDAPP_NO_GIT_TAG
+  GIT_TAG :=
+else
+  GIT_TAG := $(shell git describe --tags --always)
+  ifdef STDAPP_FORCE_GIT_TAG
+    VSN := $(GIT_TAG)
+  endif
+endif
 
 # if VSN not yet defined, get nonempty vsn from any existing .app.src or
 # .app file, use git tag, if any, or default (note that sed regexp matching
 # is greedy, so the rightmost {vsn, "..."} in the input will be selected)
-VSN ?= $(shell echo '{vsn,"$(DEFAULT_VSN)"}' '{vsn,"$(shell git describe --tags --always)"}' `cat $(APP_FILE) $(APP_SRC_FILE) 2> /dev/null` | sed -n 's/.*{vsn,[ 	]*"\([^"][^"]*\)".*/\1/p')
+VSN ?= $(shell echo '{vsn,"$(DEFAULT_VSN)"}' '{vsn,"$(GIT_TAG)"}' `cat $(APP_FILE) $(APP_SRC_FILE) 2> /dev/null` | sed -n 's/.*{vsn,[ 	]*"\([^"][^"]*\)".*/\1/p')
 
 # ensure sane default values if not already defined at this point
 ERLC_FLAGS ?= +debug_info +warn_obsolete_guard +warn_export_all
