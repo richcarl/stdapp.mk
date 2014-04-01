@@ -127,7 +127,7 @@ endif
 # if VSN not yet defined, get nonempty vsn from any existing .app.src or
 # .app file, use git tag, if any, or default (note that sed regexp matching
 # is greedy, so the rightmost {vsn, "..."} in the input will be selected)
-VSN ?= $(shell echo '{vsn,"$(DEFAULT_VSN)"}' '{vsn,"$(GIT_TAG)"}' `cat $(APP_FILE) $(APP_SRC_FILE) 2> /dev/null` | sed -n 's/.*{vsn,[ 	]*"\([^"][^"]*\)".*/\1/p')
+VSN ?= $(shell echo '{vsn,"$(DEFAULT_VSN)"}' '{vsn,"$(GIT_TAG)"}' `cat $(APP_FILE) $(APP_SRC_FILE) 2> /dev/null` | sed -n 's/.*{[[:space:]]*vsn[[:space:]]*,[[:space:]]*"\([^"][^"]*\)".*/\1/p')
 
 # ensure sane default values if not already defined at this point
 ERLC_FLAGS ?= +debug_info +warn_obsolete_guard +warn_export_all
@@ -211,9 +211,9 @@ clean-docs:
 # (note the special sed loop here to merge any multi-line modules declarations)
 $(APP_FILE): $(APP_SRC_FILE) | $(EBIN_DIR)
 	$(PROGRESS)
-	sed -e 's/{vsn,[ 	]*\({[^}]*}\)\?[^}]*}/{vsn, "$(VSN)"}/' \
-	    -e ':x;/{modules,[ 	]*[^}]*$$/{N;b x}' \
-	    -e "s/{modules,[ 	]*[^}]*}/{modules, [$(MODULES_LIST)]}/" \
+	sed -e 's/{[[:space:]]*vsn[[:space:]]*,[[:space:]]*\({[^}]*}\)\?[^}]*}/{vsn, "$(VSN)"}/' \
+	    -e ':x;/{[[:space:]]*modules[[:space:]]*,[[:space:]]*[^}]*$$/{N;b x}' \
+	    -e "s/{[[:space:]]*modules[[:space:]]*,[[:space:]]*[^}]*}/{modules, [$(MODULES_LIST)]}/" \
 	    $< > $@
 
 # create a new .app.src file, or just clone the .app file if it already exists
@@ -230,7 +230,7 @@ $(APP_SRC_FILE):
 	echo >> $@ '  {applications,[kernel,stdlib]},'
 	echo >> $@ '  {env, []}'
 	echo >> $@ ' ]}.'
-	if [ -f $(APP_FILE) ]; then sed -e 's/{vsn,[ 	]*[^}]*}/{vsn, "$(VSN)"}/' $(APP_FILE) > $(@); fi
+	if [ -f $(APP_FILE) ]; then sed -e 's/{[[:space:]]*vsn[[:space:]]*,[[:space:]]*[^}]*}/{vsn, "$(VSN)"}/' $(APP_FILE) > $(@); fi
 
 # ensuring that target directories exist; use order-only prerequisites for this
 $(sort $(EBIN_DIR) $(ERL_DEPS_DIR)):
