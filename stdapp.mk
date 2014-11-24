@@ -11,6 +11,15 @@
 #   clean-tests
 #   clean-docs
 #
+# Running 'make -f stdapp.mk' in an empty directory will create the file
+# src/APPLICATION.app.src, taking the application name from the directory
+# name. You can override this using 'make APPLICATION=... -f stdapp.mk'.
+# Once the src/*.app.src (or ebin/*.app) file exists, the name of that file
+# will be used for the application name. When compiling an Erlang program
+# using stdapp.mk, the macro ?APPLICATION will be automatically defined. You
+# can override the name of this macro to avoid collisions by setting the
+# make variable APPLICATION_NAME_MACRO.
+#
 # The following is an example of a minimal top level Makefile for building
 # all applications in the lib/ subdirectory:
 #
@@ -26,8 +35,8 @@
 #
 # Run "make build-foo" to build only the application foo. Add similar rules
 # for other targets like tests-foo, docs-foo, clean-foo, etc. Any specific
-# APPNAME.mk files are expected to be in $(TOP_DIR)/apps/. If you don't pass
-# ERL_DEPS_DIR, the .d files will be placed in the ebin directory of the
+# APPLICATION.mk files are expected to be in $(TOP_DIR)/apps/. If you don't
+# pass ERL_DEPS_DIR, the .d files will be placed in the ebin directory of the
 # app. Note that the $(MAKE) call runs from the app subdirectory, so it's
 # best to use absolute paths based on TOP_DIR for the parameters.
 #
@@ -78,12 +87,29 @@ DOC_DIR ?= doc
 TEST_DIR ?= test
 BIN_DIR ?= bin
 ERL_DEPS_DIR ?= $(EBIN_DIR)
-APPNAME ?= $(notdir $(CURDIR))
-APP_FILE ?= $(EBIN_DIR)/$(APPNAME).app
-APP_SRC_FILE ?= $(SRC_DIR)/$(APPNAME).app.src
 PROGRESS ?= @echo -n '.'
 GAWK ?= gawk
 DEFAULT_VSN ?= 0.1
+
+# figure out the application name, unless APPLICATION is already set
+# (first check for src/*.app.src, then ebin/*.app, otherwise use the dirname)
+ifndef APPLICATION
+  appsrc = $(wildcard $(SRC_DIR)/*.app.src)
+  ifneq ($(appsrc),)
+    APPLICATION := $(patsubst $(SRC_DIR)/%.app.src,%,$(appsrc))
+  else
+    appfile = $(wildcard $(EBIN_DIR)/*.app)
+    ifneq ($(appfile),)
+      APPLICATION := $(patsubst $(EBIN_DIR)/%.app,%,$(appfile))
+    else
+      APPLICATION := $(notdir $(CURDIR))
+    endif
+  endif
+endif
+export APPLICATION
+APP_SRC_FILE ?= $(SRC_DIR)/$(APPLICATION).app.src
+APP_FILE ?= $(EBIN_DIR)/$(APPLICATION).app
+APPLICATION_NAME_MACRO ?= APPLICATION
 
 # ensure that all applications under lib are available to erlc when building
 ERL_LIBS ?= $(LIB_DIR)
@@ -112,8 +138,7 @@ endif
 
 # read any system-specific definitions and rules for the application
 # (use the -I flag with Make to specify the directory for these files)
-export APPNAME
--include apps/$(APPNAME).mk
+-include apps/$(APPLICATION).mk
 
 ifdef STDAPP_NO_GIT_TAG
   GIT_TAG :=
@@ -136,7 +161,7 @@ EDOC_OPTS ?= {def,{version,"$(VSN)"}},todo,no_packages
 
 # automatically add the include directory to erlc options (the src directory
 # is added so that modules under test/ can be compiled using the same rule)
-ERLC_FLAGS += -I $(INCLUDE_DIR) -I $(SRC_DIR)
+ERLC_FLAGS += -I $(INCLUDE_DIR) -I $(SRC_DIR) -D$(APPLICATION_NAME_MACRO)="$(APPLICATION)"
 
 # computed targets
 YRL_OBJECTS := $(YRL_SOURCES:%.yrl=%.erl)
@@ -197,11 +222,9 @@ clean-tests:
 
 docs: $(DOC_DIR)/edoc-info
 
-# Note that we must run edoc from the src directory due to existing @docfile
-# "../doc/*.edoc" directives
 $(DOC_DIR)/edoc-info: $(ERL_SOURCES) $(wildcard $(DOC_DIR)/*.edoc)
 	$(PROGRESS)
-	$(ERL_NOSHELL) -eval 'edoc:application($(APPNAME), "..", [$(EDOC_OPTS)]), init:stop().'
+	$(ERL_NOSHELL) -eval 'edoc:application($(APPLICATION), "..", [$(EDOC_OPTS)]), init:stop().'
 
 .PHONY: clean-docs
 clean-docs:
@@ -221,10 +244,10 @@ $(APP_FILE): $(APP_SRC_FILE) | $(EBIN_DIR)
 $(APP_SRC_FILE):
 	$(PROGRESS)
 	mkdir -p $(dir $@)
-	echo >  $@ '{application,$(APPNAME),'
-	echo >> $@ ' [{description,"The $(APPNAME) application"},'
+	echo >  $@ '{application,$(APPLICATION),'
+	echo >> $@ ' [{description,"The $(APPLICATION) application"},'
 	echo >> $@ '  {vsn,"$(VSN)"},'
-	echo >> $@ '% {mod,{$(APPNAME)_app,[]}},'
+	echo >> $@ '% {mod,{$(APPLICATION)_app,[]}},'
 	echo >> $@ '  {modules,[]},'
 	echo >> $@ '  {registered, []},'
 	echo >> $@ '  {applications,[kernel,stdlib]},'
