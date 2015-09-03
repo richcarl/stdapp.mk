@@ -40,9 +40,11 @@
 # app. Note that the $(MAKE) call runs from the app subdirectory, so it's
 # best to use absolute paths based on TOP_DIR for the parameters.
 #
-# define STDAPP_NO_GIT_TAG if you never want to use git tags
-# define STDAPP_FORCE_GIT_TAG if you want to always use git tags
-# define STDAPP_NO_VSN_MK if you want to ignore any vsn.mk files
+# * define STDAPP_NO_GIT_TAG if you don't want to compute git tags
+# * define STDAPP_FORCE_GIT_TAG_VSN if you want to always use git tags as vsn
+# * define STDAPP_NO_VSN_MK if you want to ignore any vsn.mk files
+# * define STDAPP_VSN_ADD_GIT_HASH if you want to add a git hash suffix
+#   to the vsn (unless the vsn is equal to the git tag)
 #
 # Copyright (C) 2014 Klarna AB
 #
@@ -126,11 +128,42 @@ ERL_TEST_SOURCES := $(wildcard $(TEST_DIR)/*.erl $(TEST_DIR)/*/*.erl)
 # read any vsn.mk for backwards compatibility with many existing applications
 # NOTE: if you use vsn.mk, then add a .app file dependency like the following:
 #
-#   VSN=1.0
 #   $(APP_FILE): vsn.mk
 #
 ifndef STDAPP_NO_VSN_MK
 -include ./vsn.mk
+  ifndef VSN
+    # some apps define the <APPNAME>_VSN varable instead
+    vsnvar=$(shell echo $(APPLICATION) | tr a-z A-Z)_VSN
+    ifdef $(vsnvar)
+      VSN := $($(vsnvar))
+    endif
+  endif
+endif
+
+ifdef STDAPP_NO_GIT_TAG
+  GIT_TAG :=
+else
+  ifdef STDAPP_VSN_ADD_GIT_HASH
+    longdesc=--long
+  endif
+  GIT_TAG := $(shell git describe --tags --always $(longdesc))
+  ifdef STDAPP_FORCE_GIT_TAG_VSN
+    VSN := $(GIT_TAG)
+  endif
+endif
+
+# if VSN not yet defined, get nonempty vsn from any existing .app.src or
+# .app file, use git tag, if any, or default (note that sed regexp matching
+# is greedy, so the rightmost {vsn, "..."} in the input will be selected)
+ifndef VSN
+  VSN := $(shell echo '{vsn,"$(DEFAULT_VSN)"}' `cat $(APP_FILE) 2> /dev/null` '{vsn,"$(GIT_TAG)"}' `cat $(APP_SRC_FILE) 2> /dev/null` | sed -n 's/.*{[[:space:]]*vsn[[:space:]]*,[[:space:]]*"\([^"][^"]*\)".*/\1/p')
+endif
+
+ifdef STDAPP_VSN_ADD_GIT_HASH
+  ifneq ($(VSN),$(GIT_TAG))
+    VSN := $(VSN)-g$(shell git rev-parse --short HEAD)
+  endif
 endif
 
 # read any application-specific definitions and rules
@@ -139,20 +172,6 @@ endif
 # read any system-specific definitions and rules for the application
 # (use the -I flag with Make to specify the directory for these files)
 -include apps/$(APPLICATION).mk
-
-ifdef STDAPP_NO_GIT_TAG
-  GIT_TAG :=
-else
-  GIT_TAG := $(shell git describe --tags --always)
-  ifdef STDAPP_FORCE_GIT_TAG
-    VSN := $(GIT_TAG)
-  endif
-endif
-
-# if VSN not yet defined, get nonempty vsn from any existing .app.src or
-# .app file, use git tag, if any, or default (note that sed regexp matching
-# is greedy, so the rightmost {vsn, "..."} in the input will be selected)
-VSN ?= $(shell echo '{vsn,"$(DEFAULT_VSN)"}' '{vsn,"$(GIT_TAG)"}' `cat $(APP_FILE) $(APP_SRC_FILE) 2> /dev/null` | sed -n 's/.*{[[:space:]]*vsn[[:space:]]*,[[:space:]]*"\([^"][^"]*\)".*/\1/p')
 
 # ensure sane default values if not already defined at this point
 ERLC_FLAGS ?= +debug_info +warn_obsolete_guard +warn_export_all
