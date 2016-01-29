@@ -76,7 +76,6 @@ all: build
 
 # variable defaults
 VPATH ?=
-LIB_DIR ?= $(abspath ..)
 ERL ?= erl
 ERL_NOSHELL ?= erl -noshell +A0
 ERLC ?= erlc
@@ -89,6 +88,7 @@ DOC_DIR ?= doc
 TEST_DIR ?= test
 BIN_DIR ?= bin
 ERL_DEPS_DIR ?= $(EBIN_DIR)
+LIB_DIR ?= $(abspath ..)
 PROGRESS ?= @echo -n '.'
 GAWK ?= gawk
 DEFAULT_VSN ?= 0.1
@@ -114,6 +114,7 @@ APP_FILE ?= $(EBIN_DIR)/$(APPLICATION).app
 APPLICATION_NAME_MACRO ?= APPLICATION
 
 # ensure that all applications under lib are available to erlc when building
+# (note that ERL_LIBS may be a path - don't assume it's a single directory)
 ERL_LIBS ?= $(LIB_DIR)
 export ERL_LIBS
 
