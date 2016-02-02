@@ -244,7 +244,7 @@ docs: $(DOC_DIR)/edoc-info
 
 $(DOC_DIR)/edoc-info: $(ERL_SOURCES) $(wildcard $(DOC_DIR)/*.edoc)
 	$(PROGRESS)
-	$(ERL_NOSHELL) -eval 'edoc:application($(APPLICATION), "..", [$(EDOC_OPTS)]), init:stop().'
+	$(ERL_NOSHELL) -eval 'edoc:application($(APPLICATION), ".", [$(EDOC_OPTS)]), init:stop().'
 
 .PHONY: clean-docs
 clean-docs:
