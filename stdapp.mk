@@ -205,6 +205,9 @@ MODULES_LIST := $(subst $(space),$(comma)$(space),$(patsubst %,'%',$(MODULES)))
 VPATH := $(sort $(VPATH) $(dir $(ERL_SOURCES) $(ERL_TEST_SOURCES)) \
 		$(SRC_DIR)/ $(ERL_DEPS_DIR)/)
 
+# read any local definitions and rules
+-include ./stdapp.local.mk
+
 #
 # Targets
 #
