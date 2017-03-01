@@ -302,3 +302,29 @@ $(ERL_DEPS_DIR)/%.d: %.erl | $(ERL_DEPS_DIR)
 	$(PROGRESS)
 	$(ERLC) $(ERLC_FLAGS) -o $(ERL_DEPS_DIR) -MP -MG -MF $@ -MT "$(EBIN_DIR)/$*.beam $@" $<
 	$(GAWK) '/^[ \t]*-(behaviou?r\(|compile\({parse_transform,)/ {match($$0, /-(behaviou?r\([ \t]*([^) \t]+)|compile\({parse_transform,[ \t]*([^} \t]+))/, a); m = (a[2] a[3]); if (m != "" && (getline x < ("$(SRC_DIR)/" m ".erl")) >= 0 || (getline x < ("$(TEST_DIR)/" m ".erl")) >= 0) print "\n$(EBIN_DIR)/$*.beam: $(EBIN_DIR)/" m ".beam"}' < $< >> $@
+
+#
+# Installing
+#
+
+INSTALL ?= install
+INSTALL_DATA ?= $(INSTALL) -m 644
+INSTALL_D ?= $(INSTALL) -d
+CP_RECURSIVE ?= cp -r -d --preserve=mode --remove-destination
+
+ERLANG_INSTALL_LIB_DIR ?= /tmp/lib/erlang/lib
+
+INSTALL_ROOT := $(DESTDIR)$(ERLANG_INSTALL_LIB_DIR)/$(APPLICATION)
+INSTALL_DIRS := $(EBIN_DIR) $(BIN_DIR) $(PRIV_DIR) $(INCLUDE_DIR) $(DOC_DIR) $(INSTALL_EXTRA_DIRS)
+INSTALL_FILES := README* NOTICE* LICENSE* COPYING* $(INSTALL_EXTRA_FILES)
+INSTALL_FILTER += -name ".git*" -o -name "*.edoc"
+
+install:
+	$(INSTALL_D) $(INSTALL_ROOT)
+	for file in $(INSTALL_FILES); do \
+	  if [ -f $${file} ]; then $(INSTALL_DATA) -D $${file} $(INSTALL_ROOT)/$${file}; fi; done
+	for dir in $(INSTALL_DIRS); do \
+	  if [ -d $${dir} ]; then \
+	    $(CP_RECURSIVE) -t $(INSTALL_ROOT) $${dir} && \
+	    find $(INSTALL_ROOT)/$${dir} \( $(INSTALL_FILTER) \) -print0 | xargs -0 rm -f; \
+	  fi; done
