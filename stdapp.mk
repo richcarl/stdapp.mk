@@ -91,6 +91,7 @@ ERL_DEPS_DIR ?= $(EBIN_DIR)
 LIB_DIR ?= $(abspath ..)
 PROGRESS ?= @echo -n '.'
 GAWK ?= gawk
+SED ?= sed
 DEFAULT_VSN ?= 0.1
 
 # figure out the application name, unless APPLICATION is already set
@@ -125,7 +126,6 @@ ERL_SOURCES := $(wildcard $(SRC_DIR)/*.erl $(SRC_DIR)/*/*.erl \
 		 $(SRC_DIR)/*/*/*.erl)
 ERL_TEST_SOURCES := $(wildcard $(TEST_DIR)/*.erl $(TEST_DIR)/*/*.erl)
 
-
 # read any vsn.mk for backwards compatibility with many existing applications
 # NOTE: if you use vsn.mk, then add a .app file dependency like the following:
 #
@@ -158,7 +158,7 @@ endif
 # .app file, use git tag, if any, or default (note that sed regexp matching
 # is greedy, so the rightmost {vsn, "..."} in the input will be selected)
 ifndef VSN
-  VSN := $(shell echo '{vsn,"$(DEFAULT_VSN)"}' `cat $(APP_FILE) 2> /dev/null` '{vsn,"$(GIT_TAG)"}' `cat $(APP_SRC_FILE) 2> /dev/null` | sed -n 's/.*{[[:space:]]*vsn[[:space:]]*,[[:space:]]*"\([^"][^"]*\)".*/\1/p')
+  VSN := $(shell echo '{vsn,"$(DEFAULT_VSN)"}' `cat $(APP_FILE) 2> /dev/null` '{vsn,"$(GIT_TAG)"}' `cat $(APP_SRC_FILE) 2> /dev/null` | $(SED) -n 's/.*{[[:space:]]*vsn[[:space:]]*,[[:space:]]*"\([^"][^"]*\)".*/\1/p')
 endif
 
 ifdef STDAPP_VSN_ADD_GIT_HASH
@@ -254,7 +254,7 @@ clean-docs:
 # (note the special sed loop here to merge any multi-line modules declarations)
 $(APP_FILE): $(APP_SRC_FILE) | $(EBIN_DIR)
 	$(PROGRESS)
-	sed -e 's/{[[:space:]]*vsn[[:space:]]*,[[:space:]]*\({[^}]*}\)\?[^}]*}/{vsn, "$(VSN)"}/' \
+	$(SED) -e 's/{[[:space:]]*vsn[[:space:]]*,[[:space:]]*\({[^}]*}\)\?[^}]*}/{vsn, "$(VSN)"}/' \
 	    -e ':x;/{[[:space:]]*modules[[:space:]]*,[[:space:]]*[^}]*$$/{N;b x}' \
 	    -e "s/{[[:space:]]*modules[[:space:]]*,[[:space:]]*[^}]*}/{modules, [$(MODULES_LIST)]}/" \
 	    $< > $@
@@ -273,7 +273,7 @@ $(APP_SRC_FILE):
 	echo >> $@ '  {applications,[kernel,stdlib]},'
 	echo >> $@ '  {env, []}'
 	echo >> $@ ' ]}.'
-	if [ -f $(APP_FILE) ]; then sed -e 's/{[[:space:]]*vsn[[:space:]]*,[[:space:]]*[^}]*}/{vsn, "$(VSN)"}/' $(APP_FILE) > $(@); fi
+	if [ -f $(APP_FILE) ]; then $(SED) -e 's/{[[:space:]]*vsn[[:space:]]*,[[:space:]]*[^}]*}/{vsn, "$(VSN)"}/' $(APP_FILE) > $(@); fi
 
 # ensuring that target directories exist; use order-only prerequisites for this
 $(sort $(EBIN_DIR) $(ERL_DEPS_DIR)):
