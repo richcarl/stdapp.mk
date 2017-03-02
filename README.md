@@ -1,8 +1,9 @@
 stdapp.mk
 =========
 
-Generic Makefile for building Erlang applications. Available under the MIT
-License (see LICENSE). Copyright (C) 2014 Klarna AB.
+Generic Makefile for building Erlang applications. Distributed under the MIT
+License (see the file LICENSE). Copyright (C) 2014-2017 Klarna AB. Written
+by Richard Carlsson.
 
 Prerequisites: GNU Make, GNU AWK (gawk).
 
@@ -16,6 +17,7 @@ Predefined Make targets:
     build
     tests
     docs
+    install
     clean
     distclean
     realclean
@@ -45,12 +47,14 @@ for other targets like `tests`, `docs`, `clean`, etc.
  * Run with `-jN` for parallel builds. Add rules like `build-foo: build-bar`
    to control the build order of applications.
 
- * Additional rules needed for an application can be placed in a file
-   `$(TOP_DIR)/apps/$(APPNAME).mk`, or in a file `app.mk` file in the
-   application directory.
-
  * A top level `config.mk` (e.g., generated via autoconf) will automatically
-   be included if it exists.
+   be included if it exists. The file `stdapp.local.mk` is also included if
+   it exists, for local customizations such as additional targets for all
+   apps. Use the `-I` flag to tell `make` to where to look for these files.
+
+ * Additional rules and definitions needed for a specific application can be
+   placed in a file `apps/$(APPLICATION).mk`, or in a file `app.mk` file in
+   the application directory.
 
  * Header file dependencies are computed using the built-in facilities of
    `erlc`. If you don't pass `ERL_DEPS_DIR` as in the above example, the
@@ -69,15 +73,17 @@ for other targets like `tests`, `docs`, `clean`, etc.
    dependencies between applications, add build order rules to the top
    Makefile.
 
- * VSN will be taken from any existing `vsn.mk` file, `.app.src`, or `.app`
-   file in the application, or otherwise computed from the git tag (like
-   Rebar does).
+ * VSN will be taken from any existing `vsn.mk` file,
+   `$(APPLICATION).app.src`, or `$(APPLICATION).app` file in the
+   application, or otherwise computed from the git tag (like Rebar does).
 
- * If no `.app.src` file exists, one will be created. (If an `.app` file
-   exists, it will be used to create the `.app.src`. Keep the `.app.src`
-   file in version control, but not the `.app` file.)
+ * If no `$(APPLICATION).app.src` file exists, one will be created. (If an
+   `$(APPLICATION).app` file exists, it will be used to create the
+   `$(APPLICATION).app.src`. You should keep the `$(APPLICATION).app.src`
+   file in version control, but not the `$(APPLICATION).app` file.)
 
- * The `.app` file is checked for readability to prevent nasty surprises.
+ * The `$(APPLICATION).app` file is checked for readability to prevent nasty
+   surprises.
 
 The following is an example of a complementary `app.mk` file with additional
 rules for an application containing a port program in C under `c_src`:
