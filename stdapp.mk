@@ -177,6 +177,9 @@ endif
 # (use the -I flag with Make to specify the directory for these files)
 -include apps/$(APPLICATION).mk
 
+# read any local definitions and rules
+-include stdapp.local.mk
+
 # ensure sane default values if not already defined at this point
 ERLC_FLAGS ?= +debug_info +warn_obsolete_guard +warn_export_all
 YRL_FLAGS ?=
@@ -207,9 +210,6 @@ MODULES_LIST := $(subst $(space),$(comma)$(space),$(patsubst %,'%',$(MODULES)))
 # $(SRC_DIR) are always present in the VPATH even if there are no sources)
 VPATH := $(sort $(VPATH) $(dir $(ERL_SOURCES) $(ERL_TEST_SOURCES)) \
 		$(SRC_DIR)/ $(ERL_DEPS_DIR)/)
-
-# read any local definitions and rules
--include stdapp.local.mk
 
 #
 # Targets
