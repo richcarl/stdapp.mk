@@ -258,8 +258,11 @@ clean-docs:
 # create .app file by replacing {vsn, ...} and {modules, ...} in .app.src file,
 # also handling the case when the value of vsn is a tuple (as used by rebar);
 # MODULES_LIST will contain single quote characters, so must be in double quotes
-# (note the special sed loop here to merge any multi-line modules declarations)
-$(APP_FILE): $(APP_SRC_FILE) | $(EBIN_DIR)
+# (note the special sed loop here to merge any multi-line modules declarations).
+# The dependency on SRC_DIR will trigger a rebuild of the APP_FILE whenever
+# source files are added or removed, but not when existing files are modified.
+# Changes in source subdirectories are not currently detected.
+$(APP_FILE): $(APP_SRC_FILE) $(SRC_DIR) | $(EBIN_DIR)
 	$(PROGRESS)
 	$(SED) -e 's/\({[[:space:]]*vsn[[:space:]]*,[[:space:]]*\)\({[^}]*}\)\?[^}]*}/\1"$(VSN)"}/' \
 	    -e ':x;/{[[:space:]]*modules\([^}[:alnum:]][^}]*\)\?$$/{N;b x}' \
@@ -268,9 +271,8 @@ $(APP_FILE): $(APP_SRC_FILE) | $(EBIN_DIR)
 
 # create a new .app.src file, or just clone the .app file if it already exists
 # (note: overwriting is easier than a multi-line conditional in a recipe)
-$(APP_SRC_FILE):
+$(APP_SRC_FILE): | $(SRC_DIR)
 	$(PROGRESS)
-	mkdir -p $(dir $@)
 	echo >  $@ '{application,$(APPLICATION),'
 	echo >> $@ ' [{description,"The $(APPLICATION) application"},'
 	echo >> $@ '  {vsn,"$(VSN)"},'
@@ -283,7 +285,7 @@ $(APP_SRC_FILE):
 	if [ -f $(APP_FILE) ]; then $(SED) -e 's/\({[[:space:]]*vsn[[:space:]]*,[[:space:]]*\)[^}]*}/\1"$(VSN)"}/' $(APP_FILE) > $(@); fi
 
 # ensuring that target directories exist; use order-only prerequisites for this
-$(sort $(EBIN_DIR) $(ERL_DEPS_DIR)):
+$(sort $(EBIN_DIR) $(ERL_DEPS_DIR) $(SRC_DIR)):
 	mkdir -p $@
 
 #
