@@ -234,13 +234,12 @@ build: $(ERL_OBJECTS) $(APP_FILE)
 tests: $(ERL_TEST_OBJECTS)
 
 realclean: distclean clean-docs
-	rm -f $(APP_FILE)
 
 distclean: clean
 	rm -f $(ERL_DEPS) $(ERL_TEST_DEPS)
 
 clean: clean-tests
-	rm -f $(ERL_OBJECTS) $(YRL_OBJECTS)
+	rm -f $(ERL_OBJECTS) $(YRL_OBJECTS) $(APP_FILE)
 
 .PHONY: clean-tests
 clean-tests:
