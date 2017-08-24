@@ -57,9 +57,9 @@
 # Run "make build-foo" to build only the application foo. Add similar rules
 # for other targets like tests-foo, docs-foo, clean-foo, etc. Any specific
 # APPLICATION.mk files are expected to be in $(TOP_DIR)/apps/. If you don't
-# pass ERL_DEPS_DIR, the .d files will be placed in the ebin directory of the
-# app. Note that the $(MAKE) call runs from the app subdirectory, so it's
-# best to use absolute paths based on TOP_DIR for the parameters.
+# pass ERL_DEPS_DIR, the .d files will be placed in the source directory.
+# Note that the $(MAKE) call runs from the app subdirectory, so it's best to
+# use absolute paths based on TOP_DIR for the parameters.
 #
 # * define STDAPP_NO_GIT_TAG if you don't want to compute git tags
 # * define STDAPP_FORCE_GIT_TAG_VSN if you want to always use git tags as vsn
@@ -89,8 +89,14 @@ INCLUDE_DIR ?= include
 PRIV_DIR ?= priv
 DOC_DIR ?= doc
 TEST_DIR ?= test
+TEST_EBIN_DIR ?= $(TEST_DIR)
 BIN_DIR ?= bin
-ERL_DEPS_DIR ?= $(EBIN_DIR)
+ifndef ERL_DEPS_DIR
+  ERL_TEST_DEPS_DIR ?= $(TEST_DIR)
+else
+  ERL_TEST_DEPS_DIR ?= $(ERL_DEPS_DIR)
+endif
+ERL_DEPS_DIR ?= $(SRC_DIR)
 LIB_DIR ?= $(abspath ..)
 PROGRESS ?= @echo -n '.'
 GAWK ?= gawk
@@ -127,7 +133,7 @@ YRL_SOURCES := $(wildcard $(SRC_DIR)/*.yrl $(SRC_DIR)/*/*.yrl \
 		 $(SRC_DIR)/*/*/*.yrl)
 ERL_SOURCES := $(wildcard $(SRC_DIR)/*.erl $(SRC_DIR)/*/*.erl \
 		 $(SRC_DIR)/*/*/*.erl)
-ERL_TEST_SOURCES := $(wildcard $(TEST_DIR)/*.erl $(TEST_DIR)/*/*.erl)
+ERL_TEST_SOURCES := $(wildcard $(TEST_DIR)/*.erl)
 
 # read any vsn.mk for backwards compatibility with many existing applications
 # NOTE: if you use vsn.mk, then add a .app file dependency like the following:
@@ -193,9 +199,9 @@ ERLC_FLAGS += -I $(INCLUDE_DIR) -I $(SRC_DIR) -D$(APPLICATION_NAME_MACRO)="$(APP
 YRL_OBJECTS := $(YRL_SOURCES:%.yrl=%.erl)
 ERL_SOURCES += $(YRL_OBJECTS)
 ERL_OBJECTS := $(addprefix $(EBIN_DIR)/, $(notdir $(ERL_SOURCES:%.erl=%.beam)))
-ERL_TEST_OBJECTS := $(addprefix $(EBIN_DIR)/, $(notdir $(ERL_TEST_SOURCES:%.erl=%.beam)))
+ERL_TEST_OBJECTS := $(addprefix $(TEST_EBIN_DIR)/, $(notdir $(ERL_TEST_SOURCES:%.erl=%.beam)))
 ERL_DEPS=$(ERL_OBJECTS:$(EBIN_DIR)/%.beam=$(ERL_DEPS_DIR)/%.d)
-ERL_TEST_DEPS=$(ERL_TEST_OBJECTS:$(EBIN_DIR)/%.beam=$(ERL_DEPS_DIR)/%.d)
+ERL_TEST_DEPS=$(ERL_TEST_OBJECTS:$(TEST_EBIN_DIR)/%.beam=$(ERL_TEST_DEPS_DIR)/%.d)
 MODULES := $(sort $(ERL_OBJECTS:$(EBIN_DIR)/%.beam=%))
 
 # comma-separated list of single-quoted module names
@@ -209,7 +215,7 @@ MODULES_LIST := $(subst $(space),$(comma)$(space),$(patsubst %,'%',$(MODULES)))
 # $(sort) removes duplicates; also ensure that at least $(ERL_DEPS_DIR) and
 # $(SRC_DIR) are always present in the VPATH even if there are no sources)
 VPATH := $(sort $(VPATH) $(dir $(ERL_SOURCES) $(ERL_TEST_SOURCES)) \
-		$(SRC_DIR)/ $(ERL_DEPS_DIR)/)
+		$(SRC_DIR)/ $(ERL_DEPS_DIR)/ $(ERL_TEST_DEPS_DIR)/)
 
 #
 # Targets
@@ -228,10 +234,17 @@ ifeq (,$(findstring clean,$(MAKECMDGOALS)))
   endif
 endif
 
+$(ERL_DEPS): | $(ERL_DEPS_DIR)
+$(ERL_TEST_DEPS): | $(ERL_TEST_DEPS_DIR)
+
 build: $(ERL_OBJECTS) $(APP_FILE)
 	@$(ERL_NOSHELL) -eval 'erlang:halt(case file:consult("$(APP_FILE)") of {ok,_}->0; _->1 end)' || { echo '*** error: $(APP_FILE) is not readable'; exit 1; }
 
+$(ERL_OBJECTS): | $(EBIN_DIR)
+
 tests: $(ERL_TEST_OBJECTS)
+
+$(ERL_TEST_OBJECTS): | $(TEST_EBIN_DIR)
 
 realclean: distclean clean-docs
 
@@ -285,29 +298,28 @@ $(APP_SRC_FILE): | $(SRC_DIR)
 	if [ -f $(APP_FILE) ]; then $(SED) -e 's/\({[[:space:]]*vsn[[:space:]]*,[[:space:]]*\)[^}]*}/\1"$(VSN)"}/' $(APP_FILE) > $(@); fi
 
 # ensuring that target directories exist; use order-only prerequisites for this
-$(sort $(EBIN_DIR) $(ERL_DEPS_DIR) $(SRC_DIR)):
+$(sort $(EBIN_DIR) $(ERL_DEPS_DIR) $(ERL_TEST_DEPS_DIR) $(SRC_DIR) $(TEST_DIR)):
 	mkdir -p $@
 
 #
 # Pattern rules
 #
 
-$(EBIN_DIR)/%.beam: %.erl | $(EBIN_DIR)
+$(EBIN_DIR)/%.beam $(TEST_EBIN_DIR)/%.beam: %.erl
 	$(PROGRESS)
-	$(ERLC) $(ERLC_FLAGS) -o $(EBIN_DIR) $<
+	p=$(if $(findstring $<,$(ERL_TEST_SOURCES)),$(TEST_EBIN_DIR),$(EBIN_DIR)); $(ERLC) -pa "$$p" $(ERLC_FLAGS) -o $(@D) $<
 
 %.erl: %.yrl
 	$(PROGRESS)
-	$(ERLC) $(YRL_FLAGS) -o $(dir $@) $<
+	$(ERLC) $(YRL_FLAGS) -o $(@D) $<
 
 # automatically generated dependencies for header files and local behaviours
 # (there is no point in generating dependencies for behaviours in other
 # applications, since we cannot cause them to be built from the current app)
 # NOTE: currently doesn't find behaviour/transform modules in subdirs of src
-$(ERL_DEPS_DIR)/%.d: %.erl | $(ERL_DEPS_DIR)
+$(ERL_DEPS_DIR)/%.d $(ERL_TEST_DEPS_DIR)/%.d: %.erl
 	$(PROGRESS)
-	$(ERLC) $(ERLC_FLAGS) -o $(ERL_DEPS_DIR) -MP -MG -MF $@ -MT "$(EBIN_DIR)/$*.beam $@" $<
-	$(GAWK) '/^[ \t]*-(behaviou?r\(|compile\({parse_transform,)/ {match($$0, /-(behaviou?r\([ \t]*([^) \t]+)|compile\({parse_transform,[ \t]*([^} \t]+))/, a); m = (a[2] a[3]); if (m != "" && (getline x < ("$(SRC_DIR)/" m ".erl")) >= 0 || (getline x < ("$(TEST_DIR)/" m ".erl")) >= 0) print "\n$(EBIN_DIR)/$*.beam: $(EBIN_DIR)/" m ".beam"}' < $< >> $@
+	d=$(if $(findstring $<,$(ERL_TEST_SOURCES)),$(TEST_EBIN_DIR),$(EBIN_DIR)); $(ERLC) $(ERLC_FLAGS) -o $(ERL_DEPS_DIR) -MP -MG -MF $@ -MT "$$d/$*.beam $@" $< && $(GAWK) -v d="$$d" '/^[ \t]*-(behaviou?r\(|compile\({parse_transform,)/ {match($$0, /-(behaviou?r\([ \t]*([^) \t]+)|compile\({parse_transform,[ \t]*([^} \t]+))/, a); m = (a[2] a[3]); if (m != "" && (getline x < ("$(SRC_DIR)/" m ".erl")) >= 0) print "\n" d "/$*.beam: $(EBIN_DIR)/" m ".beam"; else if (m != "" && (getline x < ("$(TEST_DIR)/" m ".erl")) >= 0) print "\n" d "/$*.beam: $(TEST_EBIN_DIR)/" m ".beam"}' < $< >> $@
 
 #
 # Installing
