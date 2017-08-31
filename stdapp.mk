@@ -79,6 +79,7 @@ all: build
 
 # variable defaults
 VPATH ?=
+NODEPS_TARGETS ?=
 ERL ?= erl
 ERL_NOSHELL ?= erl -noshell +A0
 ERLC ?= erlc
@@ -226,10 +227,11 @@ VPATH := $(sort $(VPATH) $(dir $(ERL_SOURCES) $(ERL_TEST_SOURCES)) \
 .PRECIOUS: $(YRL_OBJECTS)
 
 # read the .d file corresponding to each .erl file, UNLESS making clean!
-ifeq (,$(findstring clean,$(MAKECMDGOALS)))
+NODEPS_TARGETS += clean distclean realclean clean-tests clean-docs
+ifneq (,$(filter-out $(NODEPS_TARGETS),$(MAKECMDGOALS)))
   -include $(ERL_DEPS)
   # only read the .d file for test modules if actually building tests
-  ifeq (tests,$(filter tests,$(MAKECMDGOALS)))
+  ifneq (,$(filter tests $(ERL_TEST_OBJECTS),$(MAKECMDGOALS)))
     -include $(ERL_TEST_DEPS)
   endif
 endif
@@ -248,7 +250,10 @@ $(ERL_TEST_OBJECTS): | $(TEST_EBIN_DIR)
 
 realclean: distclean clean-docs
 
-distclean: clean
+distclean: clean clean-deps
+
+.PHONY: clean-deps
+clean-deps:
 	rm -f $(ERL_DEPS) $(ERL_TEST_DEPS)
 
 clean: clean-tests
