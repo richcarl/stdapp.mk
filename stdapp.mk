@@ -330,17 +330,24 @@ $(ERL_DEPS_DIR)/%.d $(ERL_TEST_DEPS_DIR)/%.d: %.erl
 # Installing
 #
 
+INSTALL_DIRS ?= $(EBIN_DIR) $(BIN_DIR) $(PRIV_DIR) $(INCLUDE_DIR) $(DOC_DIR)
+INSTALL_DIRS += $(INSTALL_EXTRA_DIRS)
+
+ALWAYS_INSTALL_FILES ?= README* NOTICE* LICENSE* COPYING* AUTHOR* CONTRIB*
+INSTALL_FILES += $(ALWAYS_INSTALL_FILES)
+INSTALL_FILES += $(INSTALL_EXTRA_FILES)
+
+# this find-filter is used to strip files from copied INSTALL_DIRS directories
+INSTALL_FILTER += -name "*.edoc" -o -name ".git*" -o -name ".svn*"
+
+ERLANG_INSTALL_LIB_DIR ?= /tmp/lib/erlang/lib
+
 INSTALL ?= install
 INSTALL_DATA ?= $(INSTALL) -m 644
 INSTALL_D ?= $(INSTALL) -d
 CP_RECURSIVE ?= cp -r -d --preserve=mode --remove-destination
 
-ERLANG_INSTALL_LIB_DIR ?= /tmp/lib/erlang/lib
-
 INSTALL_ROOT := $(DESTDIR)$(ERLANG_INSTALL_LIB_DIR)/$(APPLICATION)
-INSTALL_DIRS := $(EBIN_DIR) $(BIN_DIR) $(PRIV_DIR) $(INCLUDE_DIR) $(DOC_DIR) $(INSTALL_EXTRA_DIRS)
-INSTALL_FILES := README* NOTICE* LICENSE* COPYING* $(INSTALL_EXTRA_FILES)
-INSTALL_FILTER += -name ".git*" -o -name "*.edoc"
 
 install:
 	$(INSTALL_D) $(INSTALL_ROOT)
