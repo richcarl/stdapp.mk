@@ -203,7 +203,9 @@ ERL_OBJECTS := $(addprefix $(EBIN_DIR)/, $(notdir $(ERL_SOURCES:%.erl=%.beam)))
 ERL_TEST_OBJECTS := $(addprefix $(TEST_EBIN_DIR)/, $(notdir $(ERL_TEST_SOURCES:%.erl=%.beam)))
 ERL_DEPS=$(ERL_OBJECTS:$(EBIN_DIR)/%.beam=$(ERL_DEPS_DIR)/%.d)
 ERL_TEST_DEPS=$(ERL_TEST_OBJECTS:$(TEST_EBIN_DIR)/%.beam=$(ERL_TEST_DEPS_DIR)/%.d)
-MODULES := $(sort $(ERL_OBJECTS:$(EBIN_DIR)/%.beam=%))
+
+# the modules of the application, not including any eunit test modules (named "*_tests")
+MODULES := $(sort $(filter-out %_tests, $(ERL_OBJECTS:$(EBIN_DIR)/%.beam=%)))
 
 # comma-separated list of single-quoted module names
 # (the comma/space variables are needed to work around Make's argument parsing)
@@ -338,23 +340,30 @@ INSTALL_FILES += $(ALWAYS_INSTALL_FILES)
 INSTALL_FILES += $(INSTALL_EXTRA_FILES)
 
 # this find-filter is used to strip files from copied INSTALL_DIRS directories
-INSTALL_FILTER += -name "*.edoc" -o -name ".git*" -o -name ".svn*"
+# (note that we do not install any eunit *_tests modules in EBIN_DIR; also see below)
+INSTALL_FILTER += -path "$(EBIN_DIR)/*_tests.beam" -o -name "*.edoc" -o -name ".git*" -o -name ".svn*"
 
 ERLANG_INSTALL_LIB_DIR ?= /tmp/lib/erlang/lib
 
 INSTALL ?= install
 INSTALL_DATA ?= $(INSTALL) -m 644
 INSTALL_D ?= $(INSTALL) -d
-CP_RECURSIVE ?= cp -r -d --preserve=mode --remove-destination
 
 INSTALL_ROOT := $(DESTDIR)$(ERLANG_INSTALL_LIB_DIR)/$(APPLICATION)
 
+# note the special hack here to install eunit *_tests modules in TEST_EBIN_DIR if they exist
 install:
 	$(INSTALL_D) $(INSTALL_ROOT)
 	for file in $(INSTALL_FILES); do \
-	  if [ -f $${file} ]; then $(INSTALL_DATA) -D $${file} $(INSTALL_ROOT)/$${file}; fi; done
+	  if [ -f "$${file}" ]; then $(INSTALL_DATA) -D "$${file}" "$(INSTALL_ROOT)/$${file}"; fi; done
 	for dir in $(INSTALL_DIRS); do \
-	  if [ -d $${dir} ]; then \
-	    $(CP_RECURSIVE) -t $(INSTALL_ROOT) $${dir} && \
-	    find $(INSTALL_ROOT)/$${dir} \( $(INSTALL_FILTER) \) -print0 | xargs -0 rm -f; \
-	  fi; done
+	  if [ -d "$${dir}" ]; then \
+	    $(INSTALL_D) "$(INSTALL_ROOT)/$${dir}" && \
+	    find "$${dir}" \( $(INSTALL_FILTER) \) -prune -o '!' -type d -printf "%p\0" \
+	      | xargs -0 -I'{}' $(INSTALL_DATA) -D "{}" "$(INSTALL_ROOT)/{}"; \
+	  fi; \
+	  if [ "$${dir}" == "$(TEST_EBIN_DIR)" ]; then \
+	    find $(EBIN_DIR) -name "*_tests.beam" -printf "%P\0" \
+	      | xargs -0 -I'{}' $(INSTALL_DATA) -D "$(EBIN_DIR)/{}" "$(INSTALL_ROOT)/$(TEST_EBIN_DIR)/{}"; \
+	  fi; \
+	done
