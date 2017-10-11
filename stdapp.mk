@@ -303,7 +303,7 @@ $(APP_SRC_FILE): | $(SRC_DIR)
 	if [ -f $(APP_FILE) ]; then $(SED) -e 's/\({[[:space:]]*vsn[[:space:]]*,[[:space:]]*\)[^}]*}/\1"$(VSN)"}/' $(APP_FILE) > $(@); fi
 
 # ensuring that target directories exist; use order-only prerequisites for this
-$(sort $(EBIN_DIR) $(ERL_DEPS_DIR) $(ERL_TEST_DEPS_DIR) $(SRC_DIR) $(TEST_DIR)):
+$(sort $(EBIN_DIR) $(TEST_EBIN_DIR) $(ERL_DEPS_DIR) $(ERL_TEST_DEPS_DIR) $(SRC_DIR) $(TEST_DIR)):
 	mkdir -p $@
 
 #
