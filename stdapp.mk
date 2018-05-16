@@ -246,7 +246,6 @@ $(ERL_DEPS): | $(ERL_DEPS_DIR)
 $(ERL_TEST_DEPS): | $(ERL_TEST_DEPS_DIR)
 
 build: $(ERL_OBJECTS) $(APP_FILE)
-	@$(ERL_NOSHELL) -eval 'erlang:halt(case file:consult("$(APP_FILE)") of {ok,_}->0; _->1 end)' || { echo '*** error: $(APP_FILE) is not readable'; exit 1; }
 
 $(ERL_OBJECTS): | $(EBIN_DIR)
 
@@ -286,12 +285,19 @@ clean-docs:
 # The dependency on SRC_DIR will trigger a rebuild of the APP_FILE whenever
 # source files are added or removed, but not when existing files are modified.
 # Changes in source subdirectories are not currently detected.
+#
+# Also, ensure that the generated app file is consultable, or the
+# system may fail to start.
 $(APP_FILE): $(APP_SRC_FILE) $(SRC_DIR) | $(EBIN_DIR)
 	$(PROGRESS)
 	$(SED) -e 's/\({[[:space:]]*vsn[[:space:]]*,[[:space:]]*\)\({[^}]*}\)\?[^}]*}/\1"$(VSN)"}/' \
 	    -e ':x;/{[[:space:]]*modules\([^}[:alnum:]][^}]*\)\?$$/{N;b x}' \
 	    -e "s/\({[[:space:]]*modules[[:space:]]*,[[:space:]]*\)[^}]*}/\1[$(MODULES_LIST)]}/" \
 	    $< > $@
+	if ! $(ERL_NOSHELL) -eval 'case file:consult("$@") of {ok,_} -> halt(0); {error,E} -> io:format("$@: ~s~n", [file:format_error(E)]), halt(1) end.'; then \
+		rm -f $@ ;\
+		exit 1 ;\
+	fi
 
 # create a new .app.src file, or just clone the .app file if it already exists
 # (note: overwriting is easier than a multi-line conditional in a recipe)
