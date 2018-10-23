@@ -336,7 +336,7 @@ $(EBIN_DIR)/%.beam $(TEST_EBIN_DIR)/%.beam: %.erl
 # NOTE: currently doesn't find behaviour/transform modules in subdirs of src
 $(ERL_DEPS_DIR)/%.d $(ERL_TEST_DEPS_DIR)/%.d: %.erl
 	$(PROGRESS)
-	d=$(if $(findstring $<,$(ERL_TEST_SOURCES)),$(TEST_EBIN_DIR),$(EBIN_DIR)); $(ERLC) $(ERLC_FLAGS) -DMERL_NO_TRANSFORM -o $(ERL_DEPS_DIR) -MP -MG -MF $@ -MT "$$d/$*.beam $@" $< && $(GAWK) -v d="$$d" '/^[ \t]*-(behaviou?r\(|compile\({parse_transform,)/ {match($$0, /-(behaviou?r\([ \t]*([^) \t]+)|compile\({parse_transform,[ \t]*([^} \t]+))/, a); m = (a[2] a[3]); if (m != "" && (getline x < ("$(SRC_DIR)/" m ".erl")) >= 0) print "\n" d "/$*.beam: $(EBIN_DIR)/" m ".beam"; else if (m != "" && (getline x < ("$(TEST_DIR)/" m ".erl")) >= 0) print "\n" d "/$*.beam: $(TEST_EBIN_DIR)/" m ".beam"}' < $< >> $@
+	d=$(if $(findstring $<,$(ERL_TEST_SOURCES)),$(TEST_EBIN_DIR),$(EBIN_DIR)); $(ERLC) $(ERLC_FLAGS) -DMERL_NO_TRANSFORM -o $(ERL_DEPS_DIR) -MP -MF $@ -MT "$$d/$*.beam $@" $< && $(GAWK) -v d="$$d" '/^[ \t]*-(behaviou?r\(|compile\({parse_transform,)/ {match($$0, /-(behaviou?r\([ \t]*([^) \t]+)|compile\({parse_transform,[ \t]*([^} \t]+))/, a); m = (a[2] a[3]); if (m != "" && (getline x < ("$(SRC_DIR)/" m ".erl")) >= 0) print "\n" d "/$*.beam: $(EBIN_DIR)/" m ".beam"; else if (m != "" && (getline x < ("$(TEST_DIR)/" m ".erl")) >= 0) print "\n" d "/$*.beam: $(TEST_EBIN_DIR)/" m ".beam"}' < $< >> $@
 
 #
 # Installing
