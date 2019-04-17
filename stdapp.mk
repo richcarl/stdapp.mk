@@ -99,7 +99,6 @@ else
 endif
 ERL_DEPS_DIR ?= $(SRC_DIR)
 LIB_DIR ?= $(abspath ..)
-PROGRESS ?= @echo -n '.'
 GAWK ?= gawk
 SED ?= sed
 CP ?= /bin/cp --preserve=mode --remove-destination
@@ -107,6 +106,20 @@ CP_D ?= $(CP) -d
 MKDIR ?= /bin/mkdir
 MKDIR_P ?= $(MKDIR) -p
 DEFAULT_VSN ?= 0.1
+
+# verbosity
+# (define V to to set desired level: 0 = silent, 3 = show full commands)
+DEFAULT_V = 2
+V ?= $(DEFAULT_V)
+
+# progress indication
+# (override the STDAPP_PROGRESS_... if you want to customize the output)
+STDAPP_PROGRESS_ = $(STDAPP_PROGRESS_$(DEFAULT_V))
+STDAPP_PROGRESS_0 ?= @:;
+STDAPP_PROGRESS_1 ?= @echo -n ".";
+STDAPP_PROGRESS_2 ?= @echo "  $(@F)";
+STDAPP_PROGRESS_3 ?=
+PROGRESS = $(STDAPP_PROGRESS_$(V))
 
 # figure out the application name, unless APPLICATION is already set
 # (first check for src/*.app.src, then ebin/*.app, otherwise use the dirname)
@@ -271,8 +284,7 @@ clean-tests:
 docs: $(DOC_DIR)/edoc-info
 
 $(DOC_DIR)/edoc-info: $(ERL_SOURCES) $(wildcard $(DOC_DIR)/*.edoc)
-	$(PROGRESS)
-	$(ERL_NOSHELL) -eval 'edoc:application($(APPLICATION), ".", [$(EDOC_OPTS)]), init:stop().'
+	$(PROGRESS)$(ERL_NOSHELL) -eval 'edoc:application($(APPLICATION), ".", [$(EDOC_OPTS)]), init:stop().'
 
 .PHONY: clean-docs
 clean-docs:
@@ -289,12 +301,11 @@ clean-docs:
 # Also, ensure that the generated app file is consultable, or the
 # system may fail to start.
 $(APP_FILE): $(APP_SRC_FILE) $(SRC_DIR) | $(EBIN_DIR)
-	$(PROGRESS)
-	$(SED) -e 's/\({[[:space:]]*vsn[[:space:]]*,[[:space:]]*\)\({[^}]*}\)\?[^}]*}/\1"$(VSN)"}/' \
+	$(PROGRESS)$(SED) -e 's/\({[[:space:]]*vsn[[:space:]]*,[[:space:]]*\)\({[^}]*}\)\?[^}]*}/\1"$(VSN)"}/' \
 	    -e ':x;/{[[:space:]]*modules\([^}[:alnum:]][^}]*\)\?$$/{N;b x}' \
 	    -e "s/\({[[:space:]]*modules[[:space:]]*,[[:space:]]*\)[^}]*}/\1[$(MODULES_LIST)]}/" \
 	    $< > $@
-	if ! $(ERL_NOSHELL) -eval 'case file:consult("$@") of {ok,_} -> halt(0); {error,E} -> io:format("$@: ~s~n", [file:format_error(E)]), halt(1) end.'; then \
+	@if ! $(ERL_NOSHELL) -eval 'case file:consult("$@") of {ok,_} -> halt(0); {error,E} -> io:format("$@: ~s~n", [file:format_error(E)]), halt(1) end.'; then \
 		rm -f $@ ;\
 		exit 1 ;\
 	fi
@@ -303,40 +314,37 @@ $(APP_FILE): $(APP_SRC_FILE) $(SRC_DIR) | $(EBIN_DIR)
 # (note: overwriting is easier than a multi-line conditional in a recipe)
 $(APP_SRC_FILE): | $(SRC_DIR)
 	$(PROGRESS)
-	echo >  $@ '{application,$(APPLICATION),'
-	echo >> $@ ' [{description,"The $(APPLICATION) application"},'
-	echo >> $@ '  {vsn,"$(VSN)"},'
-	echo >> $@ '% {mod,{$(APPLICATION)_app,[]}},'
-	echo >> $@ '  {modules,[]},'
-	echo >> $@ '  {registered, []},'
-	echo >> $@ '  {applications,[kernel,stdlib]},'
-	echo >> $@ '  {env, []}'
-	echo >> $@ ' ]}.'
-	if [ -f $(APP_FILE) ]; then $(SED) -e 's/\({[[:space:]]*vsn[[:space:]]*,[[:space:]]*\)[^}]*}/\1"$(VSN)"}/' $(APP_FILE) > $(@); fi
+	@echo >  $@ '{application,$(APPLICATION),'
+	@echo >> $@ ' [{description,"The $(APPLICATION) application"},'
+	@echo >> $@ '  {vsn,"$(VSN)"},'
+	@echo >> $@ '% {mod,{$(APPLICATION)_app,[]}},'
+	@echo >> $@ '  {modules,[]},'
+	@echo >> $@ '  {registered, []},'
+	@echo >> $@ '  {applications,[kernel,stdlib]},'
+	@echo >> $@ '  {env, []}'
+	@echo >> $@ ' ]}.'
+	@if [ -f $(APP_FILE) ]; then $(SED) -e 's/\({[[:space:]]*vsn[[:space:]]*,[[:space:]]*\)[^}]*}/\1"$(VSN)"}/' $(APP_FILE) > $(@); fi
 
 # ensuring that target directories exist; use order-only prerequisites for this
 $(sort $(EBIN_DIR) $(TEST_EBIN_DIR) $(ERL_DEPS_DIR) $(ERL_TEST_DEPS_DIR) $(SRC_DIR) $(TEST_DIR)):
-	$(MKDIR_P) $@
+	$(PROGRESS)$(MKDIR_P) $@
 
 #
 # Pattern rules
 #
 
 $(EBIN_DIR)/%.beam $(TEST_EBIN_DIR)/%.beam: %.erl
-	$(PROGRESS)
-	p=$(if $(findstring $<,$(ERL_TEST_SOURCES)),$(TEST_EBIN_DIR),$(EBIN_DIR)); $(ERLC) -pa "$$p" $(ERLC_FLAGS) -o $(@D) $<
+	$(PROGRESS)p=$(if $(findstring $<,$(ERL_TEST_SOURCES)),$(TEST_EBIN_DIR),$(EBIN_DIR)); $(ERLC) -pa "$$p" $(ERLC_FLAGS) -o $(@D) $<
 
 %.erl: %.yrl
-	$(PROGRESS)
-	$(ERLC) $(YRL_FLAGS) -o $(@D) $<
+	$(PROGRESS)$(ERLC) $(YRL_FLAGS) -o $(@D) $<
 
 # automatically generated dependencies for header files and local behaviours
 # (there is no point in generating dependencies for behaviours in other
 # applications, since we cannot cause them to be built from the current app)
 # NOTE: currently doesn't find behaviour/transform modules in subdirs of src
 $(ERL_DEPS_DIR)/%.d $(ERL_TEST_DEPS_DIR)/%.d: %.erl
-	$(PROGRESS)
-	d=$(if $(findstring $<,$(ERL_TEST_SOURCES)),$(TEST_EBIN_DIR),$(EBIN_DIR)); $(ERLC) $(ERLC_FLAGS) -DMERL_NO_TRANSFORM -o $(ERL_DEPS_DIR) -MP -MF $@ -MT "$$d/$*.beam $@" $< && $(GAWK) -v d="$$d" '/^[ \t]*-(behaviou?r\(|compile\({parse_transform,)/ {match($$0, /-(behaviou?r\([ \t]*([^) \t]+)|compile\({parse_transform,[ \t]*([^} \t]+))/, a); m = (a[2] a[3]); if (m != "" && (getline x < ("$(SRC_DIR)/" m ".erl")) >= 0) print "\n" d "/$*.beam: $(EBIN_DIR)/" m ".beam"; else if (m != "" && (getline x < ("$(TEST_DIR)/" m ".erl")) >= 0) print "\n" d "/$*.beam: $(TEST_EBIN_DIR)/" m ".beam"}' < $< >> $@
+	$(PROGRESS)d=$(if $(findstring $<,$(ERL_TEST_SOURCES)),$(TEST_EBIN_DIR),$(EBIN_DIR)); $(ERLC) $(ERLC_FLAGS) -DMERL_NO_TRANSFORM -o $(ERL_DEPS_DIR) -MP -MF $@ -MT "$$d/$*.beam $@" $< && $(GAWK) -v d="$$d" '/^[ \t]*-(behaviou?r\(|compile\({parse_transform,)/ {match($$0, /-(behaviou?r\([ \t]*([^) \t]+)|compile\({parse_transform,[ \t]*([^} \t]+))/, a); m = (a[2] a[3]); if (m != "" && (getline x < ("$(SRC_DIR)/" m ".erl")) >= 0) print "\n" d "/$*.beam: $(EBIN_DIR)/" m ".beam"; else if (m != "" && (getline x < ("$(TEST_DIR)/" m ".erl")) >= 0) print "\n" d "/$*.beam: $(TEST_EBIN_DIR)/" m ".beam"}' < $< >> $@
 
 #
 # Installing
