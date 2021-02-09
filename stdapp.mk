@@ -25,6 +25,8 @@
 #   build
 #   tests
 #   docs
+#   eunit
+#   eunit-verbose
 #   install
 #   clean
 #   distclean
@@ -70,7 +72,7 @@
 
 ## DO NOT ADD ANY RULES ABOVE THIS LINE!
 ## this ensures that no include file accidentally overrides the default rule
-.PHONY: all build tests clean docs distclean realclean
+.PHONY: all build tests docs eunit eunit-verbose install clean distclean realclean
 all: build
 
 # read global configuration file, if it exists - not required to make clean
@@ -383,3 +385,9 @@ install:
 	      | xargs -0 -I'{}' $(CP_D) "$(EBIN_DIR)/{}" "$(INSTALL_ROOT)/$(TEST_EBIN_DIR)/{}"; \
 	  fi; \
 	done
+
+eunit:
+	@$(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval 'eunit:test("$(EBIN_DIR)")' -s erlang halt
+
+eunit-verbose:
+	@$(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval 'eunit:test("$(EBIN_DIR)",[verbose])' -s erlang halt
