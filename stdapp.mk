@@ -230,6 +230,9 @@ MODULES := $(sort $(filter-out %_tests, $(ERL_OBJECTS:$(EBIN_DIR)/%.beam=%)))
 # all test modules, including any eunit test modules in ERL_OBJECTS
 TEST_MODULES := $(sort $(filter %_tests, $(ERL_OBJECTS:$(EBIN_DIR)/%.beam=%)) $(ERL_TEST_OBJECTS:$(TEST_EBIN_DIR)/%.beam=%))
 
+# all modules for running eunit, skipping m_tests when m is also in the list
+EUNIT_MODULES := $(sort $(MODULES) $(filter-out $(MODULES:%=%_tests), $(filter %_tests, $(TEST_MODULES))))
+
 # all property testing modules in TEST_MODULES
 QC_MODULES := $(filter prop_%, $(filter-out %_tests, $(TEST_MODULES)))
 
@@ -239,7 +242,7 @@ comma := ,
 space :=
 space +=
 MODULES_LIST := $(subst $(space),$(comma)$(space),$(patsubst %,'%',$(MODULES)))
-TEST_MODULES_LIST := $(subst $(space),$(comma)$(space),$(patsubst %,'%',$(TEST_MODULES)))
+EUNIT_MODULES_LIST := $(subst $(space),$(comma)$(space),$(patsubst %,'%',$(EUNIT_MODULES)))
 
 # add the list of directories containing source files to VPATH (note that
 # $(sort) removes duplicates; also ensure that at least $(ERL_DEPS_DIR) and
@@ -399,10 +402,10 @@ install:
 #
 
 eunit:
-	@$(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval 'eunit:test([$(TEST_MODULES_LIST)])' -s erlang halt
+	@$(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval 'eunit:test([$(EUNIT_MODULES_LIST)])' -s erlang halt
 
 eunit-verbose:
-	@$(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval 'eunit:test("$(TEST_EBIN_DIR)",[verbose])' -s erlang halt
+	@$(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval 'eunit:test([$(EUNIT_MODULES_LIST)],[verbose])' -s erlang halt
 
 qc:
 	@for m in $(QC_MODULES); do $(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval "$(QUICKCHECK):module('$${m}')" -s erlang halt; done
