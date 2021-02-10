@@ -107,6 +107,7 @@ CP ?= /bin/cp --preserve=mode --remove-destination
 CP_D ?= $(CP) -d
 MKDIR ?= /bin/mkdir
 MKDIR_P ?= $(MKDIR) -p
+QUICKCHECK ?= proper
 DEFAULT_VSN ?= 0.1
 
 # verbosity
@@ -226,12 +227,19 @@ ERL_TEST_DEPS=$(ERL_TEST_OBJECTS:$(TEST_EBIN_DIR)/%.beam=$(ERL_TEST_DEPS_DIR)/%.
 # the modules of the application, not including any eunit test modules (named "*_tests")
 MODULES := $(sort $(filter-out %_tests, $(ERL_OBJECTS:$(EBIN_DIR)/%.beam=%)))
 
-# comma-separated list of single-quoted module names
+# all test modules, including any eunit test modules in ERL_OBJECTS
+TEST_MODULES := $(sort $(filter %_tests, $(ERL_OBJECTS:$(EBIN_DIR)/%.beam=%)) $(ERL_TEST_OBJECTS:$(TEST_EBIN_DIR)/%.beam=%))
+
+# all property testing modules in TEST_MODULES
+QC_MODULES := $(filter prop_%, $(filter-out %_tests, $(TEST_MODULES)))
+
+# comma-separated lists of single-quoted module names
 # (the comma/space variables are needed to work around Make's argument parsing)
 comma := ,
 space :=
 space +=
 MODULES_LIST := $(subst $(space),$(comma)$(space),$(patsubst %,'%',$(MODULES)))
+TEST_MODULES_LIST := $(subst $(space),$(comma)$(space),$(patsubst %,'%',$(TEST_MODULES)))
 
 # add the list of directories containing source files to VPATH (note that
 # $(sort) removes duplicates; also ensure that at least $(ERL_DEPS_DIR) and
@@ -386,8 +394,15 @@ install:
 	  fi; \
 	done
 
+#
+# Running tests
+#
+
 eunit:
-	@$(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval 'eunit:test("$(EBIN_DIR)")' -s erlang halt
+	@$(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval 'eunit:test([$(TEST_MODULES_LIST)])' -s erlang halt
 
 eunit-verbose:
-	@$(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval 'eunit:test("$(EBIN_DIR)",[verbose])' -s erlang halt
+	@$(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval 'eunit:test("$(TEST_EBIN_DIR)",[verbose])' -s erlang halt
+
+qc:
+	@for m in $(QC_MODULES); do $(ERL_NOSHELL) -pa "$(EBIN_DIR)" -pa "$(TEST_EBIN_DIR)" -eval "$(QUICKCHECK):module('$${m}')" -s erlang halt; done
